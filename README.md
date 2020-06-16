@@ -19,8 +19,8 @@ How to run client.html
       http://yourdomain/client.html#username=user1 AND
       http://yourdomain/client.html#username=user2
       
-3. Click Connect Button on both pages
+3. Click "connect to socket" button on both pages
 
-4. As user1, click start stun button.
+4. As user1, click "start stun" button.
 
 5. Try sending message by entering text in textbox and click send button.
