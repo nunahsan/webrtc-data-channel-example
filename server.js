@@ -1,5 +1,4 @@
 const PORT = process.env.PORT || 5000;
-const PORT_DEBUG = 9222;
 const ENV = process.env.ENV || "development";
 
 const http = require('http');
