@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Webrtc - Data Channel</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            .code {border: 1px dashed #ccc;font-size: 10px;color: green;padding: 10px;}
+            .hidden {display:none}
+        </style>
+    </head>
+    <body>
+
+        <h2 id='h21' class='hidden'>Offerer</h2>
+        <h2 id='h22' class='hidden'>Answerer</h2>
+
+        <div>
+            <input type="button" value="connect to socket" onclick="connect()">
+            <input id="x" type="button" value="start stun" onclick="user1StartStun()">
+        </div>
+        <div style="margin:10px">
+            <input type="text" id="txt"> 
+            <input type="button" value="send" onclick="sendMsg()">
+        </div>
+
+        <div>
+            <textarea spellcheck="false" id="log" style="width:100%;height:300px;font-size:10px;color:#222"></textarea>
+        </div>
+
+        <div id="codeuser1" class="code hidden">
+            <pre>
+
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.slim.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+var sockConn, peer, username = 'user1';
+
+sockConn = io.connect('ws://SOCKET_URL:SOCKET_PORT', {transports: ['websocket'], query: 'username=' + username});
+sockConn.on('connect', async function () {
+    console.log('connected');
+    <b>user1StartStun();</b>
+});
+sockConn.on('disconnect', function () {
+    console.log("disconnected");
+});
+sockConn.on('error', function (e) {
+    console.log("error", e);
+});
+<b>sockConn.on('message', async function (e) {</b>
+    var data = JSON.parse(e);
+    console.log(e);
+   
+    switch (data.ev) {
+        case "<b>answer_4u</b>":
+            await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+            break;
+        case "<b>candidate_4u</b>":
+            await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+            break;
+    }
+});
+
+function user1StartStun() {
+    var stunConfig = {
+        iceServers: [{
+            urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+        }]
+    };
+
+    var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection || window.msRTCPeerConnection || window.PeerConnection || window.webkitPeerConnection00;
+    if (RTCPeerConnection) {
+        peer = new RTCPeerConnection(stunConfig);
+    } else {
+        peer = new webkitRTCPeerConnection(stunConfig);
+    }
+
+    //setup data channel as offerer
+    <b>dataChannel</b> = peer.createDataChannel("private");
+
+    <b>dataChannel.onopen</b> = function () {
+        console.log("DATACHANNEL OPEN");
+    };
+
+    <b>dataChannel.onclose</b> = function () {
+        console.log("DATACHANNEL CLOSE");
+    };
+
+    <b>dataChannel.oerror</b> = function (error) {
+        console.log("DATACHANNEL ERROR:" + error);
+    };
+
+    <b>dataChannel.onmessage</b> = function (event) {
+        console.log("DATACHANNEL MSG:" + event.data);
+    };
+
+    <b>peer.onicecandidate</b> = function (event) {
+        if (event.candidate) {
+            sockConn.emit('message', JSON.stringify({
+                ev: 'candidate',
+                candidate: event.candidate
+            }));
+        }
+    };
+
+    <b>peer.onnegotiationneeded</b> = function () {
+        peer.createOffer(async function (offer) {
+            await peer.setLocalDescription(offer);
+            sockConn.emit('message', JSON.stringify({
+                ev: 'offer',
+                offer: offer
+            }));
+        }, function (error) {
+            console.log("offer error:" + error);
+        });
+    };
+}
+&lt;/script&gt;
+            </pre>
+        </div>
+
+        <div id="codeuser2" class="code hidden">
+            <pre>
+
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.slim.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+var sockConn, peer, username = 'user1';
+
+sockConn = io.connect('ws://SOCKET_URL:SOCKET_PORT', {transports: ['websocket'], query: 'username=' + username});
+sockConn.on('connect', async function () {
+    console.log('connected');
+});
+sockConn.on('disconnect', function () {
+    console.log("disconnected");
+});
+sockConn.on('error', function (e) {
+    console.log("error", e);
+});
+<b>sockConn.on('message', async function (e) {</b>
+    var data = JSON.parse(e);
+    console.log(e);
+   
+    switch (data.ev) {
+        case "<b>offer_4u</b>":
+            <b>user2StartStun</b>(new RTCSessionDescription(data.offer));
+            break;
+        case "<b>candidate_4u</b>":
+            await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+            break;
+    }
+});
+
+async function user2StartStun(offer) {
+    var stunConfig = {
+        iceServers: [{
+            urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+        }]
+    };
+
+    var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection || window.msRTCPeerConnection || window.PeerConnection || window.webkitPeerConnection00;
+    if (RTCPeerConnection) {
+        peer = new RTCPeerConnection(stunConfig);
+    } else {
+        peer = new webkitRTCPeerConnection(stunConfig);
+    }
+
+    //setup datachannel as answerer
+    peer.ondatachannel = function (event) {
+        <b>dataChannel</b> = event.channel;
+
+        <b>dataChannel</b>.onopen = function () {
+            console.log("DATACHANNEL OPEN");
+        };
+
+        <b>dataChannel</b>.onclose = function () {
+            console.log("DATACHANNEL CLOSE");
+        };
+
+        <b>dataChannel</b>.oerror = function (error) {
+            console.log("DATACHANNEL ERROR:" + error);
+        };
+
+        <b>dataChannel</b>.onmessage = function (event) {
+            console.log("DATACHANNEL MSG:" + event.data);
+        };
+    }
+
+    <b>peer.onicecandidate</b> = function (event) {
+        if (event.candidate) {
+            sockConn.emit('message', JSON.stringify({
+                ev: 'candidate',
+                candidate: event.candidate
+            }));
+        }
+    };
+
+    await peer.setRemoteDescription(offer);
+
+    <b>peer.createAnswer</b>(async  (answer) => {
+        await peer.setLocalDescription(answer);
+        sockConn.emit('message', JSON.stringify({
+            ev: 'answer',
+            answer: answer
+        }));
+    }, function (error) {
+        console.log("ERR", "create answer error" + error);
+    });
+}
+&lt;/script&gt;
+            </pre>
+        </div>
+
+        <script src="./io.js"></script>
+        <script>
+                var sockConn, peer;
+                var username = window.location.hash.split('=')[1];
+
+                if (username === 'user1') {
+                    document.getElementById('h21').classList.remove('hidden');
+                    document.getElementById('codeuser1').classList.remove('hidden');
+                } else {
+                    document.getElementById('x').remove();
+                    document.getElementById('h22').classList.remove('hidden');
+                    document.getElementById('codeuser2').classList.remove('hidden');
+                }
+
+                function connect() {
+                    sockConn = io.connect('ws://localhost:5000', {transports: ['websocket'], query: 'username=' + username});
+                    sockConn.on('connect', async function () {
+                        printLogs('connected');
+                    });
+                    sockConn.on('disconnect', function () {
+                        printLogs("disconnected");
+                    });
+                    sockConn.on('error', function (e) {
+                        printLogs("error" + e);
+                    });
+                    sockConn.on('message', async function (e) {
+                        var data = JSON.parse(e);
+                        printLogs(e);
+
+                        //as user 2
+                        if (username === 'user2') {
+                            switch (data.ev) {
+                                case "offer_4u":
+                                    user2StartStun(new RTCSessionDescription(data.offer));
+                                    break;
+                                case "candidate_4u":
+                                    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                    break;
+                            }
+                        } else {
+                            //as user 1
+                            switch (data.ev) {
+                                case "answer_4u":
+                                    await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
+                                    break;
+                                case "candidate_4u":
+                                    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                    break;
+                            }
+                        }
+                    });
+                }
+
+                function user1StartStun() {
+                    var stunConfig = {
+                        iceServers: [
+                            {
+                                urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+                            }
+                        ]
+                    };
+                    var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection || window.msRTCPeerConnection || window.PeerConnection || window.webkitPeerConnection00;
+                    if (RTCPeerConnection) {
+                        peer = new RTCPeerConnection(stunConfig);
+                    } else {
+                        peer = new webkitRTCPeerConnection(stunConfig);
+                    }
+
+                    //setup data channel as offerer
+                    dataChannel = peer.createDataChannel("private");
+                    dataChannel.onopen = function () {
+                        printLogs("DATACHANNEL OPEN");
+                    };
+                    dataChannel.onclose = function () {
+                        printLogs("DATACHANNEL CLOSE");
+                    };
+                    dataChannel.oerror = function (error) {
+                        printLogs("DATACHANNEL ERROR:" + error);
+                    };
+                    dataChannel.onmessage = function (event) {
+                        printLogs("DATACHANNEL MSG:" + event.data);
+                    };
+
+                    peer.onicecandidate = function (event) {
+                        if (event.candidate) {
+                            sockConn.emit('message', JSON.stringify({
+                                ev: 'candidate',
+                                candidate: event.candidate
+                            }));
+                        }
+                    };
+
+                    peer.onnegotiationneeded = function () {
+                        peer.createOffer(async function (offer) {
+                            await peer.setLocalDescription(offer);
+                            sockConn.emit('message', JSON.stringify({
+                                ev: 'offer',
+                                offer: offer
+                            }));
+                        }, function (error) {
+                            printLogs("offer error:" + error);
+                        });
+                    };
+                }
+
+                async function user2StartStun(offer) {
+                    var stunConfig = {
+                        iceServers: [
+                            {
+                                urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+                            }
+                        ]
+                    };
+                    var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection || window.msRTCPeerConnection || window.PeerConnection || window.webkitPeerConnection00;
+                    if (RTCPeerConnection) {
+                        peer = new RTCPeerConnection(stunConfig);
+                    } else {
+                        peer = new webkitRTCPeerConnection(stunConfig);
+                    }
+
+                    //setup datachannel as answerer
+                    peer.ondatachannel = function (event) {
+                        //get data channel from peer
+                        dataChannel = event.channel;
+                        //listen to datachannel
+                        dataChannel.onopen = function () {
+                            printLogs("DATACHANNEL OPEN");
+                        };
+                        dataChannel.onclose = function () {
+                            printLogs("DATACHANNEL CLOSE");
+                        };
+                        dataChannel.oerror = function (error) {
+                            printLogs("DATACHANNEL ERROR:" + error);
+                        };
+                        dataChannel.onmessage = function (event) {
+                            printLogs("DATACHANNEL MSG:" + event.data);
+                        };
+                    }
+
+                    peer.onicecandidate = function (event) {
+                        if (event.candidate) {
+                            sockConn.emit('message', JSON.stringify({
+                                ev: 'candidate',
+                                candidate: event.candidate
+                            }));
+                        }
+                    };
+
+                    await peer.setRemoteDescription(offer);
+                    peer.createAnswer(async  (answer) => {
+                        await peer.setLocalDescription(answer);
+                        sockConn.emit('message', JSON.stringify({
+                            ev: 'answer',
+                            answer: answer
+                        }));
+                    }, function (error) {
+                        printLogs("ERR", "create answer error" + error);
+                    });
+
+                }
+
+                function sendMsg() {
+                    var txt = document.getElementById('txt').value;
+                    if (txt === '') {
+                        return;
+                    }
+
+                    if (dataChannel && dataChannel.readyState === 'open') {
+                        dataChannel.send(JSON.stringify({
+                            ev: 'message',
+                            data: txt
+                        }));
+                    }
+                }
+
+                function printLogs(str) {
+                    var f = document.getElementById('log');
+                    f.innerHTML = f.innerHTML + "\n\n" + str;
+                }
+        </script>
+
+    </body>
+</html>
