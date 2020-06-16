@@ -18,6 +18,7 @@ How to run client.html
 2. Open url : 
       http://yourdomain/client.html#username=user1 AND
       http://yourdomain/client.html#username=user2
+(Best to open 2 browsers side by side)      
       
 3. Click "connect to socket" button on both pages
 
